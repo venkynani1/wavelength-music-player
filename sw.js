@@ -1,0 +1,27 @@
+// Service worker: lets Wavelength install as an app and open even on a weak connection.
+// Network first for the app's own files; never caches /api or other sites (music, YouTube).
+const CACHE = 'wl-v3';
+const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(r => r || caches.match('/')))
+  );
+});

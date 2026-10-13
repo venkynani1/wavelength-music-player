@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0b0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wavelength">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <title>Wavelength</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,6 +41,9 @@ h1{font-size:30px;font-weight:800;margin-bottom:18px;letter-spacing:-.02em}
 h2{font-size:20px;font-weight:700;margin:30px 0 14px}
 .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--panel2);color:var(--muted);vertical-align:middle;margin-left:6px}
 .mt{margin-top:14px}
+.hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.install{padding:8px 14px;border-radius:999px;background:var(--accent);color:#fff;font-weight:700;font-size:13px;white-space:nowrap;margin-top:4px}
+body.standalone .install{display:none}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{padding:7px 14px;border-radius:999px;background:var(--panel2);font-size:13px;font-weight:600}
 .chip:hover{background:var(--hover)}
@@ -148,7 +158,7 @@ body.yt main{padding-bottom:290px}
 </div>
 
 <div class="ytbox" id="ytbox" hidden>
-  <div class="ythead"><span>Playing from YouTube</span><button id="ytclose" title="Stop and close">✕</button></div>
+  <div class="ythead"><span>YouTube · control it from the player bar</span><button id="ytclose" title="Stop and close">✕</button></div>
   <div class="ytwrap"><div id="ytframe"></div></div>
 </div>
 
@@ -193,6 +203,11 @@ const INDIAN = {
   'Tamil Latest':      { q: `latest tamil songs ${YEAR}` },
   'Tamil Old Hits':    { q: 'old tamil hit songs' }
 };
+const HEROES = {
+  Telugu: ['Chiranjeevi','Balakrishna','Nagarjuna','Venkatesh','Pawan Kalyan','Mahesh Babu','Jr NTR','Ram Charan','Allu Arjun','Prabhas','Ravi Teja','Nani','Vijay Deverakonda'],
+  Tamil: ['Rajinikanth','Kamal Haasan','Thalapathy Vijay','Ajith Kumar','Suriya','Dhanush','Vikram','Sivakarthikeyan','Karthi','Vijay Sethupathi']
+};
+const heroQuery = (h, ind) => `${h} ${ind.toLowerCase()} hit video songs`;
 const HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.5 2.3 4 6.4 4c2.3 0 3.8 1.3 4.6 2.6h2C13.8 5.3 15.3 4 17.6 4c4.1 0 6 4.5 4.4 7.7C19.5 16.4 12 21 12 21z"/></svg>';
 const PLAY = '<path d="M8 5v14l11-7z"/>', PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
 
@@ -249,6 +264,7 @@ const slim = t => ({ id: t.id, src: t.src || 'audius', vid: t.vid, title: t.titl
 /* ---------- State ---------- */
 const LISTS = {};
 let queue = [], idx = -1, shuffle = false, repeat = 'off', genre = 'All', indianTab = 'Trending in India';
+let heroInd = 'Telugu', hero = 'mix';
 let token = 0, lastQuery = '', errStreak = 0;
 let liked = store.get('wl_liked', []), recent = store.get('wl_recent', []);
 const cur = () => queue[idx];
@@ -262,7 +278,9 @@ function loadYT() {
     window.onYouTubeIframeAPIReady = () => {
       ytPlayer = new YT.Player('ytframe', {
         width: '100%', height: '100%',
-        playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
+        // controls:0 hides YouTube's own control bar (our player bar drives it), fs:0 no fullscreen,
+        // disablekb:1 no YouTube shortcuts, iv_load_policy:3 no annotations. Fewer taps land on YouTube links.
+        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, controls: 0, fs: 0, disablekb: 1, iv_load_policy: 3, origin: location.origin },
         events: { onReady: () => resolve(ytPlayer), onStateChange: onYTState, onError: onYTError }
       });
     };
@@ -327,13 +345,16 @@ function go(name, arg) {
 
 function home() {
   const tok = ++token;
-  view.innerHTML = `<h1>${greet()}</h1>
+  view.innerHTML = `<div class="hrow"><h1>${greet()}</h1><button class="install" data-install>⤓ Install app</button></div>
+    <h2>Hero hits <span class="tag">YouTube</span></h2>
+    <div id="herosec"></div>
     <h2>Indian hits <span class="tag">YouTube</span></h2>
     <div class="chips">${indianChips()}</div><div id="ind" class="mt"></div>
     <h2>Free &amp; independent <span class="tag">Ad-free</span></h2>
     <div class="chips">${GENRES.map(g => `<button class="chip ${g === genre ? 'on' : ''}" data-genre="${esc(g)}">${esc(g)}</button>`).join('')}</div>
     <div id="trend" class="mt">${skel(8)}</div>
     <h2>Popular playlists</h2><div id="pl" class="grid">${skel(4)}</div>`;
+  loadHeroes(tok);
   loadIndian(tok);
   api('/tracks/trending', { time: 'week', genre: genre === 'All' ? null : genre })
     .then(d => { if (tok === token) $('#trend').innerHTML = trackList(d.filter(playable).slice(0, 30), 'trending'); })
@@ -350,6 +371,47 @@ function loadIndian(tok = token) {
   yt(cfg.mode === 'popular' ? { mode: 'popular' } : { q: cfg.q })
     .then(d => { if (tok === token && tab === indianTab) $('#ind').innerHTML = trackList(d.filter(songLength).slice(0, 30), 'indian'); })
     .catch(fail('#ind'));
+}
+
+/* Hero hits: one hero's songs, or a daily "Hero Mix" from 5 heroes (same picks all day so results stay cached) */
+const dayKey = () => new Date().toISOString().slice(0, 10);
+function seeded(arr, seedStr) {
+  let s = [...seedStr].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const heroPool = () => heroInd === 'Both'
+  ? [...HEROES.Telugu.map(h => [h, 'Telugu']), ...HEROES.Tamil.map(h => [h, 'Tamil'])]
+  : HEROES[heroInd].map(h => [h, heroInd]);
+function heroHtml() {
+  return `<div class="chips">${['Telugu', 'Tamil', 'Both'].map(i => `<button class="chip ${i === heroInd ? 'on' : ''}" data-ind="${i}">${i}</button>`).join('')}</div>
+    <div class="chips mt"><button class="chip ${hero === 'mix' ? 'on' : ''}" data-hero="mix">🔀 Hero Mix</button>${heroPool().map(([h]) => `<button class="chip ${hero === h ? 'on' : ''}" data-hero="${esc(h)}">${esc(h)}</button>`).join('')}</div>
+    <div id="heroes" class="mt">${skel(6)}</div>`;
+}
+function loadHeroes(tok = token) {
+  const box = $('#herosec'); if (!box) return;
+  if (hero !== 'mix' && !heroPool().some(([h]) => h === hero)) hero = 'mix';
+  box.innerHTML = heroHtml();
+  const tag = hero + heroInd;
+  const done = list => {
+    if (tok !== token || tag !== hero + heroInd || !$('#heroes')) return;
+    $('#heroes').innerHTML = (list.length ? `<button class="bigplay" data-playall="heroes" title="Play all"><svg viewBox="0 0 24 24">${PLAY}</svg></button>` : '') + trackList(list, 'heroes');
+  };
+  if (hero === 'mix') {
+    const picks = seeded(heroPool(), dayKey() + heroInd).slice(0, 5);
+    Promise.allSettled(picks.map(([h, ind]) => yt({ q: heroQuery(h, ind) }))).then(rs => {
+      const lists = rs.filter(r => r.status === 'fulfilled').map(r => r.value.filter(songLength).slice(0, 8));
+      if (!lists.length) return fail('#heroes')(rs[0].reason);
+      const out = [], seen = new Set();
+      for (let i = 0; i < 8; i++) for (const l of lists) { const t = l[i]; if (t && !seen.has(t.id)) { seen.add(t.id); out.push(t); } }
+      done(out);
+    });
+  } else {
+    const ind = heroPool().find(([h]) => h === hero)?.[1] || heroInd;
+    yt({ q: heroQuery(hero, ind) }).then(d => done(d.filter(songLength).slice(0, 30))).catch(fail('#heroes'));
+  }
 }
 
 let debounce;
@@ -465,7 +527,7 @@ function toggleLike(t) {
   if (document.querySelector('[data-view="library"].on')) library();
 }
 let tt;
-function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 1800); }
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), msg.length > 40 ? 4500 : 1800); }
 
 /* ---------- Events ---------- */
 document.addEventListener('click', e => {
@@ -473,6 +535,9 @@ document.addEventListener('click', e => {
   if (like) { const [k, i] = like.dataset.like.split(':'); toggleLike(LISTS[k]?.[i]); return; }
   if (e.target.closest('[data-like-current]')) { toggleLike(cur()); return; }
   const v = e.target.closest('[data-view]'); if (v) { go(v.dataset.view); return; }
+  if (e.target.closest('[data-install]')) { installApp(); return; }
+  const hi = e.target.closest('[data-ind]'); if (hi) { heroInd = hi.dataset.ind; loadHeroes(); return; }
+  const hb = e.target.closest('[data-hero]'); if (hb) { hero = hb.dataset.hero; loadHeroes(); return; }
   const ind = e.target.closest('[data-indian]'); if (ind) { indianTab = ind.dataset.indian; $('#ind') ? loadIndian() : go('home'); return; }
   const g = e.target.closest('[data-genre]'); if (g) { genre = g.dataset.genre; go('home'); return; }
   const pl = e.target.closest('[data-playlist]'); if (pl) { go('playlist', pl.dataset.playlist); return; }
@@ -526,6 +591,19 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => next(true));
   navigator.mediaSession.setActionHandler('previoustrack', prev);
 }
+
+/* ---------- Install as an app (PWA) ---------- */
+let installPrompt = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if (isStandalone()) document.body.classList.add('standalone');
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });
+window.addEventListener('appinstalled', () => { installPrompt = null; document.body.classList.add('standalone'); toast('Wavelength installed'); });
+async function installApp() {
+  if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; return; }
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  toast(ios ? 'In Safari: tap Share, then "Add to Home Screen"' : 'Open the browser menu (⋮) and tap "Install app" or "Add to Home screen"');
+}
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 
 loadYT(); // warm up the YouTube player so the first tap plays quickly
 go('home');
