@@ -32,6 +32,8 @@ svg{width:20px;height:20px;fill:currentColor;flex-shrink:0}
 main{background:linear-gradient(180deg,#22183a 0,var(--panel) 280px);border-radius:12px;overflow-y:auto;padding:28px 28px 40px}
 h1{font-size:30px;font-weight:800;margin-bottom:18px;letter-spacing:-.02em}
 h2{font-size:20px;font-weight:700;margin:30px 0 14px}
+.tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--panel2);color:var(--muted);vertical-align:middle;margin-left:6px}
+.mt{margin-top:14px}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{padding:7px 14px;border-radius:999px;background:var(--panel2);font-size:13px;font-weight:600}
 .chip:hover{background:var(--hover)}
@@ -97,6 +99,14 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radiu
 .bottomnav{display:none}
 .toast{position:fixed;left:50%;bottom:calc(var(--player-h) + var(--nav-h) + 16px);transform:translateX(-50%);background:var(--text);color:#000;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
 .toast.show{opacity:1}
+/* YouTube player card (kept visible, at least 200px tall, per YouTube's embed rules) */
+.ytbox{position:fixed;right:16px;bottom:calc(var(--player-h) + var(--nav-h) + 12px);width:356px;background:#000;border-radius:12px;overflow:hidden;box-shadow:0 12px 40px #000a;z-index:5}
+.ytbox[hidden]{display:none}
+.ythead{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:12px;color:var(--muted);font-weight:600}
+.ythead button{color:var(--muted);font-size:16px;line-height:1;padding:2px 4px}
+.ytwrap{height:200px}
+#ytframe{width:100%;height:100%;display:block;border:0}
+body.yt main{padding-bottom:290px}
 /* mobile */
 @media (max-width:760px){
   :root{--player-h:64px;--nav-h:60px}
@@ -118,6 +128,8 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radiu
   .player .mprog{display:block}
   .bottomnav{display:flex;position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:linear-gradient(transparent,#000 40%);justify-content:space-around;align-items:center;padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav .nav-btn{flex-direction:column;gap:3px;font-size:11px;background:none;padding:6px}
+  .ytbox{left:8px;right:8px;width:auto;bottom:calc(var(--nav-h) + 68px)}
+  body.yt main{padding-bottom:300px}
 }
 .mprog{display:none;position:absolute;left:10px;right:10px;bottom:0;height:2px;background:#ffffff33;border-radius:2px;overflow:hidden}
 .mprog i{display:block;height:100%;width:0;background:var(--text)}
@@ -130,9 +142,14 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radiu
     <button class="nav-btn on" data-view="home"><svg viewBox="0 0 24 24"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>Home</button>
     <button class="nav-btn" data-view="search"><svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>Search</button>
     <button class="nav-btn" data-view="library"><svg viewBox="0 0 24 24"><path d="M4 3h2v18H4zm5 0h2v18H9zm5.3.7 1.9-.6 5 17.2-1.9.6z"/></svg>Your Library</button>
-    <div class="side-foot">Free, full-length tracks streamed from the open <a href="https://audius.co" target="_blank" rel="noopener">Audius</a> network. No ads.</div>
+    <div class="side-foot">Indian film songs play from official YouTube channels. Ad-free independent music streams from <a href="https://audius.co" target="_blank" rel="noopener">Audius</a>.</div>
   </aside>
   <main id="main"><div id="view"></div></main>
+</div>
+
+<div class="ytbox" id="ytbox" hidden>
+  <div class="ythead"><span>Playing from YouTube</span><button id="ytclose" title="Stop and close">✕</button></div>
+  <div class="ytwrap"><div id="ytframe"></div></div>
 </div>
 
 <footer class="player">
@@ -166,6 +183,16 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radiu
 <script>
 const APP = 'wavelength-player';
 const GENRES = ['All','Electronic','Hip-Hop/Rap','Pop','Rock','Lo-Fi','R&B/Soul','Alternative','House','Jazz','Ambient','Acoustic'];
+const YEAR = new Date().getFullYear();
+const INDIAN = {
+  'Trending in India': { mode: 'popular' },
+  'Telugu Latest':     { q: `latest telugu songs ${YEAR}` },
+  'Telugu Old Hits':   { q: 'old telugu melody songs' },
+  'Hindi Latest':      { q: `latest hindi songs ${YEAR}` },
+  'Hindi Old Hits':    { q: 'old hindi evergreen songs' },
+  'Tamil Latest':      { q: `latest tamil songs ${YEAR}` },
+  'Tamil Old Hits':    { q: 'old tamil hit songs' }
+};
 const HEART = '<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.3C.4 8.5 2.3 4 6.4 4c2.3 0 3.8 1.3 4.6 2.6h2C13.8 5.3 15.3 4 17.6 4c4.1 0 6 4.5 4.4 7.7C19.5 16.4 12 21 12 21z"/></svg>';
 const PLAY = '<path d="M8 5v14l11-7z"/>', PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
 
@@ -180,7 +207,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
 
-/* ---------- Audius API ---------- */
+/* ---------- Audius API (free, ad-free indie music) ---------- */
 let HOST = null;
 async function host() {
   if (HOST) return HOST;
@@ -200,14 +227,74 @@ async function api(path, params = {}) {
 }
 const streamUrl = id => `${HOST}/v1/tracks/${id}/stream?app_name=${APP}`;
 const playable = t => t && t.is_streamable !== false && !t.is_delete;
-const slim = t => ({ id: t.id, title: t.title, duration: t.duration, genre: t.genre, user: { name: t.user?.name }, artwork: t.artwork });
+
+/* ---------- YouTube (Indian film songs, via our /api/yt proxy) ---------- */
+const ytCache = new Map();
+function yt(params) {
+  const k = JSON.stringify(params);
+  if (ytCache.has(k)) return ytCache.get(k);
+  const p = fetch('/api/yt?' + new URLSearchParams(params)).then(async r => {
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    return j.data || [];
+  });
+  ytCache.set(k, p);
+  p.catch(() => ytCache.delete(k));
+  return p;
+}
+const songLength = t => t.duration >= 60 && t.duration <= 900; // skip shorts and long jukeboxes
+
+const slim = t => ({ id: t.id, src: t.src || 'audius', vid: t.vid, title: t.title, duration: t.duration, genre: t.genre, user: { name: t.user?.name }, artwork: t.artwork });
 
 /* ---------- State ---------- */
 const LISTS = {};
-let queue = [], idx = -1, shuffle = false, repeat = 'off', genre = 'All', token = 0, lastQuery = '';
+let queue = [], idx = -1, shuffle = false, repeat = 'off', genre = 'All', indianTab = 'Trending in India';
+let token = 0, lastQuery = '', errStreak = 0;
 let liked = store.get('wl_liked', []), recent = store.get('wl_recent', []);
 const cur = () => queue[idx];
 const isLiked = id => liked.some(t => t.id === id);
+
+/* ---------- Playback engine: one interface over <audio> and the YouTube player ---------- */
+let ytPlayer = null, ytReady = null;
+function loadYT() {
+  if (ytReady) return ytReady;
+  ytReady = new Promise(resolve => {
+    window.onYouTubeIframeAPIReady = () => {
+      ytPlayer = new YT.Player('ytframe', {
+        width: '100%', height: '100%',
+        playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
+        events: { onReady: () => resolve(ytPlayer), onStateChange: onYTState, onError: onYTError }
+      });
+    };
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  });
+  return ytReady;
+}
+const eng = {
+  isYT() { return cur()?.src === 'yt'; },
+  play() { if (this.isYT()) ytPlayer?.playVideo?.(); else audio.play().catch(() => {}); },
+  pause() { if (this.isYT()) ytPlayer?.pauseVideo?.(); else audio.pause(); },
+  paused() { return this.isYT() ? ytPlayer?.getPlayerState?.() !== 1 : audio.paused; },
+  time() { return (this.isYT() ? ytPlayer?.getCurrentTime?.() : audio.currentTime) || 0; },
+  dur() { return (this.isYT() ? (ytPlayer?.getDuration?.() || cur()?.duration) : audio.duration) || 0; },
+  seek(t) { if (this.isYT()) ytPlayer?.seekTo?.(t, true); else audio.currentTime = t; },
+  volume(v) { audio.volume = v / 100; ytPlayer?.setVolume?.(v); }
+};
+function setPlaying(on) { $('#ppi').innerHTML = on ? PAUSE : PLAY; if (on) errStreak = 0; }
+function showYT(on) { $('#ytbox').hidden = !on; document.body.classList.toggle('yt', on); }
+function onYTState(e) {
+  if (!eng.isYT()) return;
+  if (e.data === 1) setPlaying(true);
+  else if (e.data === 2 || e.data === 5) setPlaying(false);
+  else if (e.data === 0) { setPlaying(false); next(false); }
+}
+function onYTError() { if (eng.isYT()) skipBroken("This video can't play here, skipping"); }
+function skipBroken(msg) {
+  if (++errStreak > 5) { toast('Several tracks failed. Try another list.'); errStreak = 0; return; }
+  toast(msg); setTimeout(() => next(true), 800);
+}
 
 /* ---------- Rendering helpers ---------- */
 const skel = n => Array(n || 6).fill('<div class="skel"></div>').join('');
@@ -227,7 +314,8 @@ const cards = list => list.length ? list.map(p => `
   <button class="card" data-playlist="${esc(p.id)}">${img(p, true)}
     <div class="t">${esc(p.playlist_name)}</div><div class="a">${esc(p.user?.name)}</div>
   </button>`).join('') : '<p class="empty">No playlists found.</p>';
-const fail = sel => e => { const el = $(sel); if (el) el.innerHTML = `<p class="err">Couldn't load this right now (${esc(e.message)}). Try again in a moment.</p>`; };
+const fail = sel => e => { const el = $(sel); if (el) el.innerHTML = `<p class="err">Couldn't load this right now (${esc(e.message)}).</p>`; };
+const indianChips = () => Object.keys(INDIAN).map(k => `<button class="chip ${k === indianTab ? 'on' : ''}" data-indian="${esc(k)}">${esc(k)}</button>`).join('');
 function greet() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
 
 /* ---------- Views ---------- */
@@ -240,9 +328,13 @@ function go(name, arg) {
 function home() {
   const tok = ++token;
   view.innerHTML = `<h1>${greet()}</h1>
+    <h2>Indian hits <span class="tag">YouTube</span></h2>
+    <div class="chips">${indianChips()}</div><div id="ind" class="mt"></div>
+    <h2>Free &amp; independent <span class="tag">Ad-free</span></h2>
     <div class="chips">${GENRES.map(g => `<button class="chip ${g === genre ? 'on' : ''}" data-genre="${esc(g)}">${esc(g)}</button>`).join('')}</div>
-    <h2>Trending ${genre === 'All' ? '' : esc(genre) + ' '}this week</h2><div id="trend">${skel(8)}</div>
+    <div id="trend" class="mt">${skel(8)}</div>
     <h2>Popular playlists</h2><div id="pl" class="grid">${skel(4)}</div>`;
+  loadIndian(tok);
   api('/tracks/trending', { time: 'week', genre: genre === 'All' ? null : genre })
     .then(d => { if (tok === token) $('#trend').innerHTML = trackList(d.filter(playable).slice(0, 30), 'trending'); })
     .catch(fail('#trend'));
@@ -250,25 +342,42 @@ function home() {
     .then(d => { if (tok === token) $('#pl').innerHTML = cards(d.slice(0, 12)); })
     .catch(fail('#pl'));
 }
+function loadIndian(tok = token) {
+  const el = $('#ind'); if (!el) return;
+  el.innerHTML = skel(8);
+  document.querySelectorAll('[data-indian]').forEach(b => b.classList.toggle('on', b.dataset.indian === indianTab));
+  const tab = indianTab, cfg = INDIAN[tab];
+  yt(cfg.mode === 'popular' ? { mode: 'popular' } : { q: cfg.q })
+    .then(d => { if (tok === token && tab === indianTab) $('#ind').innerHTML = trackList(d.filter(songLength).slice(0, 30), 'indian'); })
+    .catch(fail('#ind'));
+}
 
 let debounce;
 function search() {
   ++token;
   view.innerHTML = `<h1>Search</h1>
     <label class="search"><svg viewBox="0 0 24 24"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
-    <input id="q" placeholder="Songs, artists or playlists" autocomplete="off" value="${esc(lastQuery)}"></label>
+    <input id="q" placeholder="Songs, movies, artists…" autocomplete="off" enterkeyhint="search" value="${esc(lastQuery)}"></label>
     <div id="results"></div>`;
   const q = $('#q');
   q.focus();
-  q.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => runSearch(q.value.trim()), 350); });
+  q.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => runSearch(q.value.trim()), 700); });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(debounce); runSearch(q.value.trim()); q.blur(); } });
   runSearch(lastQuery);
 }
 function runSearch(q) {
   lastQuery = q;
   const out = $('#results'), tok = ++token;
-  if (!q) { out.innerHTML = `<h2>Browse genres</h2><div class="chips">${GENRES.slice(1).map(g => `<button class="chip" data-genre="${esc(g)}">${esc(g)}</button>`).join('')}</div>`; return; }
-  out.innerHTML = `<h2>Songs</h2><div id="rs">${skel(6)}</div><h2>Playlists</h2><div id="rp" class="grid"></div>`;
-  api('/tracks/search', { query: q }).then(d => { if (tok === token) $('#rs').innerHTML = trackList(d.filter(playable).slice(0, 25), 'search'); }).catch(fail('#rs'));
+  if (!q) {
+    out.innerHTML = `<h2>Indian hits</h2><div class="chips">${indianChips()}</div>
+      <h2>Free &amp; independent genres</h2><div class="chips">${GENRES.slice(1).map(g => `<button class="chip" data-genre="${esc(g)}">${esc(g)}</button>`).join('')}</div>`;
+    return;
+  }
+  out.innerHTML = `<h2>Songs <span class="tag">YouTube</span></h2><div id="ry">${q.length < 3 ? '<p class="empty">Type at least 3 letters.</p>' : skel(6)}</div>
+    <h2>Free tracks <span class="tag">Ad-free</span></h2><div id="rs">${skel(4)}</div>
+    <h2>Playlists</h2><div id="rp" class="grid"></div>`;
+  if (q.length >= 3) yt({ q }).then(d => { if (tok === token) $('#ry').innerHTML = trackList(d.filter(t => t.duration >= 60).slice(0, 20), 'ysearch'); }).catch(fail('#ry'));
+  api('/tracks/search', { query: q }).then(d => { if (tok === token) $('#rs').innerHTML = trackList(d.filter(playable).slice(0, 15), 'search'); }).catch(fail('#rs'));
   api('/playlists/search', { query: q }).then(d => { if (tok === token) $('#rp').innerHTML = cards(d.slice(0, 8)); }).catch(fail('#rp'));
 }
 
@@ -298,8 +407,20 @@ function playlist(id) {
 function playList(list, i) { queue = list.slice(); idx = i; load(true); }
 function load(autoplay) {
   const t = cur(); if (!t) return;
-  audio.src = streamUrl(t.id);
-  if (autoplay) audio.play().catch(() => {});
+  if (t.src === 'yt') {
+    audio.pause(); audio.removeAttribute('src'); audio.load();
+    showYT(true);
+    loadYT().then(p => {
+      if (cur() !== t) return;
+      p.setVolume(+vol.value);
+      autoplay ? p.loadVideoById(t.vid) : p.cueVideoById(t.vid);
+    });
+  } else {
+    ytPlayer?.stopVideo?.();
+    showYT(false);
+    audio.src = streamUrl(t.id);
+    if (autoplay) audio.play().catch(() => {});
+  }
   $('#now').innerHTML = `${img(t)}<div class="meta"><div class="t">${esc(t.title)}</div><div class="a">${esc(t.user?.name)}</div></div>
     <button class="like ${isLiked(t.id) ? 'on' : ''}" data-like-current title="Like" style="opacity:1">${HEART}</button>`;
   document.title = `${t.title} · ${t.user?.name || ''}`;
@@ -315,21 +436,21 @@ function load(autoplay) {
 }
 function next(manual) {
   if (!queue.length) return;
-  if (repeat === 'one' && !manual) { audio.currentTime = 0; audio.play(); return; }
+  if (repeat === 'one' && !manual) { eng.seek(0); eng.play(); return; }
   if (shuffle && queue.length > 1) { let n; do n = Math.floor(Math.random() * queue.length); while (n === idx); idx = n; }
   else if (idx < queue.length - 1) idx++;
   else if (repeat === 'all' || manual) idx = 0;
-  else { audio.pause(); return; }
+  else { eng.pause(); return; }
   load(true);
 }
 function prev() {
   if (!queue.length) return;
-  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  if (eng.time() > 3) { eng.seek(0); return; }
   idx = idx > 0 ? idx - 1 : queue.length - 1; load(true);
 }
 function toggle() {
-  if (!cur()) { const l = LISTS.trending || LISTS.liked; if (l?.length) playList(l, 0); return; }
-  audio.paused ? audio.play() : audio.pause();
+  if (!cur()) { const l = LISTS.indian?.length ? LISTS.indian : LISTS.trending || LISTS.liked; if (l?.length) playList(l, 0); return; }
+  eng.paused() ? eng.play() : eng.pause();
 }
 function markPlaying() {
   document.querySelectorAll('.row').forEach(r => r.classList.toggle('playing', LISTS[r.dataset.list]?.[r.dataset.i]?.id === cur()?.id));
@@ -352,6 +473,7 @@ document.addEventListener('click', e => {
   if (like) { const [k, i] = like.dataset.like.split(':'); toggleLike(LISTS[k]?.[i]); return; }
   if (e.target.closest('[data-like-current]')) { toggleLike(cur()); return; }
   const v = e.target.closest('[data-view]'); if (v) { go(v.dataset.view); return; }
+  const ind = e.target.closest('[data-indian]'); if (ind) { indianTab = ind.dataset.indian; $('#ind') ? loadIndian() : go('home'); return; }
   const g = e.target.closest('[data-genre]'); if (g) { genre = g.dataset.genre; go('home'); return; }
   const pl = e.target.closest('[data-playlist]'); if (pl) { go('playlist', pl.dataset.playlist); return; }
   const pa = e.target.closest('[data-playall]'); if (pa) { const l = LISTS[pa.dataset.playall]; if (l?.length) playList(l, shuffle ? Math.floor(Math.random() * l.length) : 0); return; }
@@ -361,6 +483,7 @@ document.addEventListener('click', e => {
 $('#pp').onclick = toggle;
 $('#next').onclick = () => next(true);
 $('#prev').onclick = prev;
+$('#ytclose').onclick = () => { eng.pause(); showYT(false); };
 $('#shuf').onclick = () => { shuffle = !shuffle; $('#shuf').classList.toggle('on', shuffle); toast(shuffle ? 'Shuffle on' : 'Shuffle off'); };
 $('#rep').onclick = () => {
   repeat = { off: 'all', all: 'one', one: 'off' }[repeat];
@@ -371,21 +494,22 @@ $('#rep').onclick = () => {
 
 const seek = $('#seek'); let seeking = false;
 const paint = (el, pct) => el.style.setProperty('--p', pct + '%');
-seek.addEventListener('input', () => { seeking = true; paint(seek, seek.value / 10); $('#cur').textContent = fmt(seek.value / 1000 * (audio.duration || 0)); });
-seek.addEventListener('change', () => { if (audio.duration) audio.currentTime = seek.value / 1000 * audio.duration; seeking = false; });
-audio.addEventListener('timeupdate', () => {
-  const pct = audio.duration ? audio.currentTime / audio.duration * 100 : 0;
-  if (!seeking) { seek.value = pct * 10; paint(seek, pct); $('#cur').textContent = fmt(audio.currentTime); }
+seek.addEventListener('input', () => { seeking = true; paint(seek, seek.value / 10); $('#cur').textContent = fmt(seek.value / 1000 * eng.dur()); });
+seek.addEventListener('change', () => { const d = eng.dur(); if (d) eng.seek(seek.value / 1000 * d); seeking = false; });
+setInterval(() => {
+  const d = eng.dur(), t = eng.time(), pct = d ? Math.min(100, t / d * 100) : 0;
+  if (!seeking) { seek.value = pct * 10; paint(seek, pct); $('#cur').textContent = fmt(t); }
+  $('#tot').textContent = fmt(d);
   $('#mprog').style.width = pct + '%';
-});
-audio.addEventListener('loadedmetadata', () => { $('#tot').textContent = fmt(audio.duration); });
-audio.addEventListener('play', () => { $('#ppi').innerHTML = PAUSE; });
-audio.addEventListener('pause', () => { $('#ppi').innerHTML = PLAY; });
-audio.addEventListener('ended', () => next(false));
-audio.addEventListener('error', () => { if (!cur()) return; toast("Couldn't play that track, skipping"); setTimeout(() => next(true), 800); });
+}, 500);
+
+audio.addEventListener('play', () => { if (!eng.isYT()) setPlaying(true); });
+audio.addEventListener('pause', () => { if (!eng.isYT()) setPlaying(false); });
+audio.addEventListener('ended', () => { if (!eng.isYT()) next(false); });
+audio.addEventListener('error', () => { if (cur() && !eng.isYT()) skipBroken("Couldn't play that track, skipping"); });
 
 const vol = $('#vol'); let lastVol = store.get('wl_vol', 80);
-function setVol(v) { vol.value = v; audio.volume = v / 100; paint(vol, v); store.set('wl_vol', +v); }
+function setVol(v) { vol.value = v; eng.volume(+v); paint(vol, v); store.set('wl_vol', +v); }
 vol.addEventListener('input', () => setVol(vol.value));
 $('#mute').onclick = () => { if (+vol.value) { lastVol = +vol.value; setVol(0); } else setVol(lastVol || 80); };
 setVol(lastVol);
@@ -397,12 +521,13 @@ document.addEventListener('keydown', e => {
   if (e.code === 'ArrowLeft' && e.shiftKey) prev();
 });
 if ('mediaSession' in navigator) {
-  navigator.mediaSession.setActionHandler('play', () => audio.play());
-  navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  navigator.mediaSession.setActionHandler('play', () => eng.play());
+  navigator.mediaSession.setActionHandler('pause', () => eng.pause());
   navigator.mediaSession.setActionHandler('nexttrack', () => next(true));
   navigator.mediaSession.setActionHandler('previoustrack', prev);
 }
 
+loadYT(); // warm up the YouTube player so the first tap plays quickly
 go('home');
 </script>
 </body>
